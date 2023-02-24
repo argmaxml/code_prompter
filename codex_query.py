@@ -2,6 +2,7 @@ import requests
 import json
 from pathlib import Path
 from ast import literal_eval
+from typing import List, Dict, Tuple
 
 __dir__ = Path(__file__).absolute().parent
 
@@ -21,6 +22,14 @@ class CodexQuery:
         url = "https://api.openai.com/v1/completions"
         return requests.post(url, json=kwargs, headers={"Authorization": "Bearer "+self.secret}).json()
 
+    def str_query(self, prompt):
+        completions = self.complete(prompt=prompt, stop='"')["choices"]
+        ret = []
+        for c in completions:
+            if c["finish_reason"]!="stop":
+                continue
+            ret.append(c["text"].strip())
+        return ret
 
     def literal_query(self, prompt,force_type=None):
         completions = self.complete(prompt=prompt, stop=["\n", ";"])["choices"]
@@ -91,7 +100,23 @@ class ClassificationQuery(CodexQuery):
             assert is_{cls}(text) ==
             """.strip()
             return self.literal_query(prompt)
+    
 
+class ExtrapolationQuery(CodexQuery):
+    def __init__(self, secret, model="code-davinci-002", n=10):
+        super().__init__(secret, model, n)
+    
+    def extrapolate_function_value(self, function_name:str,  examples: Dict[str, str], query: str):
+        pattern = "assert {f}({q}) == {v}"
+        prompt = "\n".join([pattern.format(f=function_name, q=json.dumps(q), v=json.dumps(v)) for q,v in examples.items()])
+        prompt += f"\nassert {function_name}({json.dumps(query)}) == "
+        return self.literal_query(prompt)
+
+    def reverse_extrapolate_function(self, function_name:str,  examples:Dict[str, str], query: str):
+        pattern = "assert {v} == {f}({q})"
+        prompt = "\n".join([pattern.format(f=function_name, q=json.dumps(q), v=json.dumps(v)) for q,v in examples.items()])
+        prompt += f"\nassert {json.dumps(query)} == {function_name}(\""
+        return self.str_query(prompt)
 
 if __name__ == "__main__":
     with open(__dir__ / "config.json") as f:
@@ -114,3 +139,9 @@ specifically for every buyer
     print(cq.classify(txt,"business"))
     print ("="*20+"CLASSES"+"="*20)
     print(cq.classify(txt,["fashion", "sport", "finance"]))
+
+    eq = ExtrapolationQuery(config["openai_secret"])
+    print ("="*20+"EXTRAPOLATE"+"="*20)
+    print(eq.extrapolate_function_value("abbreviate", {"User Id": "userid", "Document id": "docid",}, "time of day"))
+
+    print(eq.reverse_extrapolate_function("abbreviate", {"User Id": "userid", "Document id": "docid",}, "dow"))
