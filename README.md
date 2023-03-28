@@ -10,14 +10,15 @@ For example, for the following prompt we would expect the LLM to output a valid 
   assert extract_tags("https://www.argmaxml.com") == [
 ```
 
-This simple OpenAI codex wrapper structures the prompt as a python code, then it filters out only the outputs that are valid syntactically.
+This simple OpenAI and AI21 wrapper structures the prompt as a python code, then it filters out only the outputs that are valid syntactically.
 
 ## Example usages
 
 ### Classification
+Using AI21 j2-grande-instruct
 ```
-    from codex_prompter import ClassificationQuery
-    cq = ClassificationQuery("openai_secret")
+    from ai21_prompter import ClassificationQuery
+    cq = ClassificationQuery("ai21_apikey")
     
     print(cq.tag("Tinder", most_common=3))
     # output: [("Dating", 4), ("Social", 2), ("hookups", 1)]
@@ -28,6 +29,7 @@ This simple OpenAI codex wrapper structures the prompt as a python code, then it
 ```
 
 ### Inverting a function
+Using OpenAI codex
 ```
     from codex_prompter import ExtrapolationQuery
     eq = ExtrapolationQuery("openai_secret")
