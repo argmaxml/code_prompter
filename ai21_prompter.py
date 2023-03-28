@@ -1,4 +1,4 @@
-import requests
+from collections import Counter
 import json
 from pathlib import Path
 from ast import literal_eval
@@ -34,6 +34,13 @@ class AI21Query:
             raise ValueError("prompt is required")
         ret = ai21.Completion.execute(**kwargs)
         return [{"text":v.data.text,"finishReason":v.finishReason["reason"]} for v in ret.completions]
+
+    def most_common_(self, lst, n=None):
+        if len(lst)==0:
+            return []
+        if type(lst[0])==list:
+            return Counter([x for l in lst for x in l]).most_common(n)
+        return Counter(lst).most_common(n)
 
     def str_query(self, prompt):
         completions = self.complete(prompt=prompt, stop='"')
@@ -82,7 +89,7 @@ class ClassificationQuery(AI21Query):
     def __init__(self, secret, model="j2-jumbo-instruct", n=10):
         super().__init__(secret, model, n)
     
-    def tag(self, text):
+    def tag(self, text, most_common=None):
         triple = '"""'
         prompt = f"""
         text = {triple}{text}{triple}
@@ -91,9 +98,12 @@ class ClassificationQuery(AI21Query):
 
         assert tags == [
         """.strip()
-        return self.list_query(prompt, str)
+        ret = self.list_query(prompt, str)
+        if most_common:
+            return self.most_common_(ret)
+        return ret
 
-    def classify(self, text, cls):
+    def classify(self, text, cls, most_common=None):
         triple = '"""'
         if type(cls)==list:
             cls_arr = ",".join(["'"+str(c)+"'" for c in cls])
@@ -113,24 +123,33 @@ class ClassificationQuery(AI21Query):
             #  check if text is classified correctly
             assert is_{cls}(text) ==
             """.strip()
-            return self.literal_query(prompt)
+            ret = self.literal_query(prompt)
+            if most_common:
+                return self.most_common_(ret)
+            return ret
     
 
 class ExtrapolationQuery(AI21Query):
     def __init__(self, secret, model="j2-jumbo-instruct", n=10):
         super().__init__(secret, model, n)
     
-    def extrapolate_function_value(self, function_name:str,  examples: Dict[str, str], query: str):
+    def extrapolate_function_value(self, function_name:str,  examples: Dict[str, str], query: str, most_common=None):
         pattern = "assert {f}({q}) == {v}"
         prompt = "\n".join([pattern.format(f=function_name, q=json.dumps(q), v=json.dumps(v)) for q,v in examples.items()])
         prompt += f"\nassert {function_name}({json.dumps(query)}) == "
-        return self.literal_query(prompt)
+        ret = self.literal_query(prompt)
+        if most_common:
+            return self.most_common_(ret)
+        return ret
 
-    def reverse_extrapolate_function(self, function_name:str,  examples:Dict[str, str], query: str):
+    def reverse_extrapolate_function(self, function_name:str,  examples:Dict[str, str], query: str, most_common=None):
         pattern = "assert {v} == {f}({q})"
         prompt = "\n".join([pattern.format(f=function_name, q=json.dumps(q), v=json.dumps(v)) for q,v in examples.items()])
         prompt += f"\nassert {json.dumps(query)} == {function_name}(\""
-        return self.str_query(prompt)
+        ret = self.str_query(prompt)
+        if most_common:
+            return self.most_common_(ret)
+        return ret
 
 if __name__ == "__main__":
     with open(__dir__ / "config.json") as f:
@@ -148,7 +167,7 @@ specifically for every buyer
     """
 
     print ("="*20+"TAGS"+"="*20)
-    print(cq.tag(txt))
+    print(cq.tag(txt, most_common=5))
     print ("="*20+"IS_BUSINESS"+"="*20)
     print(cq.classify(txt,"business"))
     print ("="*20+"CLASSES"+"="*20)
@@ -158,4 +177,4 @@ specifically for every buyer
     print ("="*20+"EXTRAPOLATE"+"="*20)
     print(eq.extrapolate_function_value("abbreviate", {"User Id": "userid", "Document id": "docid",}, "time of day"))
 
-    print(eq.reverse_extrapolate_function("abbreviate", {"User Id": "userid", "Document id": "docid",}, "dow"))
+    print(eq.reverse_extrapolate_function("abbreviate", {"User Id": "userid", "Document id": "docid",}, "dow", most_common=5))
