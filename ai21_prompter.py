@@ -17,10 +17,18 @@ class AI21Query:
     def complete(self, **kwargs):
         if "model" not in kwargs:
             kwargs["model"] = self.model
+        if "maxTokens" not in kwargs:
+            kwargs["maxTokens"] = 256
         if "n" not in kwargs:
             kwargs["numResults"] = self.n
         else:
             kwargs["numResults"]=kwargs["n"]
+            del kwargs["n"]
+        if "stop" in kwargs:
+            if type(kwargs["stop"])==str:
+                kwargs["stop"]=[kwargs["stop"]]
+            kwargs["stopSequences"]=kwargs["stop"]
+            del kwargs["stop"]
         if "prompt" not in kwargs:
             raise ValueError("prompt is required")
         ret = ai21.Completion.execute(**kwargs)
@@ -30,7 +38,7 @@ class AI21Query:
         completions = self.complete(prompt=prompt, stop='"')
         ret = []
         for c in completions:
-            if c["finishReason"]!="endoftext":
+            if c["finishReason"]!="stop":
                 continue
             ret.append(c["text"].strip())
         return ret
@@ -39,7 +47,7 @@ class AI21Query:
         completions = self.complete(prompt=prompt, stop=["\n", ";"])
         ret = []
         for c in completions:
-            if c["finishReason"]!="endoftext":
+            if c["finishReason"]!="stop":
                 continue
             try:
                 lit = literal_eval(c["text"].strip())
@@ -55,7 +63,8 @@ class AI21Query:
         completions = self.complete(prompt=prompt, stop="]")
         ret = []
         for c in completions:
-            if c["finishReason"]!="endoftext":
+            if c["finishReason"]!="stop":
+                #print(c["finishReason"])
                 continue
             try:
                 lit = literal_eval("["+c["text"] + "]")
@@ -69,7 +78,7 @@ class AI21Query:
         return ret
 
 class ClassificationQuery(AI21Query):
-    def __init__(self, secret, model="j2-grande-instruct", n=10):
+    def __init__(self, secret, model="j2-jumbo-instruct", n=10):
         super().__init__(secret, model, n)
     
     def tag(self, text):
@@ -107,7 +116,7 @@ class ClassificationQuery(AI21Query):
     
 
 class ExtrapolationQuery(AI21Query):
-    def __init__(self, secret, model="j2-grande-instruct", n=10):
+    def __init__(self, secret, model="j2-jumbo-instruct", n=10):
         super().__init__(secret, model, n)
     
     def extrapolate_function_value(self, function_name:str,  examples: Dict[str, str], query: str):
