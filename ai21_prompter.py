@@ -26,8 +26,9 @@ class AI21Query:
             del kwargs["n"]
         if "stop" in kwargs:
             if type(kwargs["stop"])==str:
-                kwargs["stop"]=[kwargs["stop"]]
-            kwargs["stopSequences"]=kwargs["stop"]
+                kwargs["stopSequences"]=[kwargs["stop"]]
+            else:
+                kwargs["stopSequences"]=[str(t) for t in kwargs["stop"]]
             del kwargs["stop"]
         if "prompt" not in kwargs:
             raise ValueError("prompt is required")
