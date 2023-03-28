@@ -23,7 +23,6 @@ class AI21Query:
             kwargs["numResults"]=kwargs["n"]
         if "prompt" not in kwargs:
             raise ValueError("prompt is required")
-        url = "https://api.openai.com/v1/completions"
         ret = ai21.Completion.execute(**kwargs)
         return [{"text":v.data.text,"finishReason":v.finishReason["reason"]} for v in ret.completions]
 
